@@ -1,0 +1,1232 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# Azure Virtual Desktop transport health\n*Select your Log Analytics workspace using the picker at the top of this workbook before applying the filters below — it is not fixed to any single environment.*\n- **Direct UDP (managed):** RDP Shortpath for managed networks - a private connection (ExpressRoute/VPN) directly between client and session host. Log Analytics `UdpUse` = 1.\n- **Direct UDP (public/STUN):** RDP Shortpath for public networks with ICE/STUN - a direct UDP connection discovered over the internet without a relay. `UdpUse` = 2.\n- **Relayed UDP (TURN):** RDP Shortpath for public networks via TURN - UDP relayed through a Microsoft-managed TURN server, typically because of symmetric NAT. `UdpUse` = 4.\n- **TCP fallback:** The session uses the supported reverse-connect TCP/TLS 443 path because no UDP Shortpath option succeeded or was reported. This can also happen if a host pool's RDP Shortpath networking settings (`ManagedPrivateUdp`/`DirectUdp`/`PublicUdp`/`RelayUdp`) disable a path by policy, or if the client blocks it via configuration (client-side group policy/RDP property `Enable RDP Shortpath for managed networks` disabled, an outdated Remote Desktop client that doesn't support Shortpath, or a local firewall blocking outbound UDP) - not only due to network conditions.\n- **Unknown:** Available diagnostics do not contain enough transport evidence; verify Connection, Network, Error, and MultiLink collection.\nCompare each transport with RTT, available bandwidth, and correlated errors before drawing conclusions. Source: [Configure RDP Shortpath for Azure Virtual Desktop](https://learn.microsoft.com/azure/virtual-desktop/configure-rdp-shortpath).\n\n---\n*Created by Jonathan Mesa | jonathan.mesa@microsoft.com | Sr. Cloud Solution Architect*"
+      },
+      "name": "Dashboard heading",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "parameters": [
+          {
+            "id": "8d289b64-c63c-4a69-9e74-45ee6c6b3560",
+            "version": "KqlParameterItem/1.0",
+            "name": "Workspace",
+            "label": "Log Analytics workspace",
+            "type": 5,
+            "isRequired": true,
+            "multiSelect": true,
+            "value": [
+              "/subscriptions/831abf62-701e-490a-ad98-dbe291510863/resourcegroups/wvdloganalyticstpgprd/providers/microsoft.operationalinsights/workspaces/wvdloganalyticstpgprd"
+            ],
+            "typeSettings": {
+              "resourceTypeFilter": {
+                "microsoft.operationalinsights/workspaces": true
+              },
+              "additionalResourceOptions": [
+                "value::1"
+              ],
+              "showDefault": false
+            }
+          },
+          {
+            "id": "a6d078d9-816c-4a52-8d02-80f62484c247",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "label": "Time range",
+            "type": 4,
+            "isRequired": true,
+            "value": {
+              "durationMs": 604800000
+            },
+            "typeSettings": {
+              "selectableValues": [
+                {
+                  "durationMs": 3600000
+                },
+                {
+                  "durationMs": 43200000
+                },
+                {
+                  "durationMs": 86400000
+                },
+                {
+                  "durationMs": 172800000
+                },
+                {
+                  "durationMs": 259200000
+                },
+                {
+                  "durationMs": 604800000
+                },
+                {
+                  "durationMs": 1209600000
+                },
+                {
+                  "durationMs": 2592000000
+                }
+              ],
+              "allowCustom": true
+            }
+          }
+        ],
+        "style": "pills"
+      },
+      "name": "Dashboard parameters",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "parameters": [
+          {
+            "id": "ba9650db-5ac0-47a0-a094-72992eb3ec10",
+            "version": "KqlParameterItem/1.0",
+            "name": "HostPoolFilter",
+            "label": "Host pool",
+            "type": 2,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "union (print value=\"All\",label=\"All host pools\"),(WVDConnections | where TimeGenerated {TimeRange} | extend value=extract(\"/hostpools/([^/]+)\",1,_ResourceId) | extend value=iff(isempty(value),\"Unknown\",value) | distinct value | project value,label=value) | order by label asc",
+            "value": [
+              "All"
+            ],
+            "timeContextFromParameter": "TimeRange",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces"
+          },
+          {
+            "id": "195849cd-32f5-4a82-8f72-2980467637d6",
+            "version": "KqlParameterItem/1.0",
+            "name": "GatewayFilter",
+            "label": "Gateway region",
+            "type": 2,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "union (print value=\"All\",label=\"All gateway regions\"),(WVDConnections | where TimeGenerated {TimeRange} | extend value=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion) | distinct value | project value,label=value) | order by label asc",
+            "value": [
+              "All"
+            ],
+            "timeContextFromParameter": "TimeRange",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces"
+          },
+          {
+            "id": "b3ce66f4-ac77-40f0-b98d-d99a6959e65b",
+            "version": "KqlParameterItem/1.0",
+            "name": "UserFilter",
+            "label": "Search or select user",
+            "type": 2,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "union (print value=\"All\",label=\"All users\"),(WVDConnections | where TimeGenerated {TimeRange} | extend value=iff(isempty(UserName),\"Unknown\",UserName) | distinct value | project value,label=value) | order by label asc",
+            "value": [
+              "All"
+            ],
+            "timeContextFromParameter": "TimeRange",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces"
+          },
+          {
+            "id": "d6553461-56cb-4286-85fd-94c29c86f2cc",
+            "version": "KqlParameterItem/1.0",
+            "name": "TransportFilter",
+            "label": "Transport outcome",
+            "type": 2,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "datatable(value:string,label:string)[\"All\",\"All transport outcomes\",\"UDP direct\",\"UDP direct\",\"UDP via TURN\",\"UDP via TURN\",\"TCP fallback\",\"TCP fallback\",\"Unknown\",\"Unknown\"]",
+            "value": [
+              "All"
+            ],
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces"
+          }
+        ],
+        "style": "pills"
+      },
+      "name": "Investigation filters",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=materialize(WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId);let B=materialize(WVDConnections|where TimeGenerated {TimeRange}|where State == \"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend HasTurn=coalesce(HasTurn,long(0)),HasShort=coalesce(HasShort,long(0)),HasWeb=coalesce(HasWeb,long(0))|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter})));let Total=toscalar(B|summarize count());let Direct=toscalar(B|summarize countif(Mode==\"UDP direct\"));let ManagedDirect=toscalar(B|summarize countif(Mode==\"UDP direct\" and tostring(UdpUse)==\"1\"));let PublicDirect=toscalar(B|summarize countif(Mode==\"UDP direct\" and tostring(UdpUse)==\"2\"));let Turn=toscalar(B|summarize countif(Mode==\"UDP via TURN\"));let TCP=toscalar(B|summarize countif(Mode==\"TCP fallback\"));let Unknown=toscalar(B|summarize countif(Mode==\"Unknown\"));union (print Metric=\"Sessions\",Value=todouble(Total),Description=\"Connected sessions matching the selected filters\",Sort=1),(print Metric=\"Direct UDP (%)\",Value=todouble(round(100.0*Direct/iff(Total==0,1,Total),1)),Description=\"Direct Shortpath without a TURN relay\",Sort=2),(print Metric=\"Direct UDP - managed (%)\",Value=todouble(round(100.0*ManagedDirect/iff(Total==0,1,Total),1)),Description=\"Private ExpressRoute/VPN path; documented UdpUse=1\",Sort=3),(print Metric=\"Direct UDP - public/STUN (%)\",Value=todouble(round(100.0*PublicDirect/iff(Total==0,1,Total),1)),Description=\"Public internet direct path via STUN; documented UdpUse=2\",Sort=4),(print Metric=\"Relayed UDP (%)\",Value=todouble(round(100.0*Turn/iff(Total==0,1,Total),1)),Description=\"Shortpath through a Microsoft TURN relay\",Sort=5),(print Metric=\"TCP fallback (%)\",Value=todouble(round(100.0*TCP/iff(Total==0,1,Total),1)),Description=\"Supported TCP/TLS 443; review only when UDP is expected\",Sort=6),(print Metric=\"Unknown (%)\",Value=todouble(round(100.0*Unknown/iff(Total==0,1,Total),1)),Description=\"Sessions without enough evidence to classify transport\",Sort=7)|order by Sort asc",
+        "size": 1,
+        "title": "Transport health summary",
+        "noDataMessage": "No connected AVD sessions were found.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "tiles",
+        "tileSettings": {
+          "showBorder": true,
+          "titleContent": {
+            "columnMatch": "Metric",
+            "formatter": 1
+          },
+          "subtitleContent": {
+            "columnMatch": "Description",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "Value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "auto"
+            }
+          }
+        }
+      },
+      "name": "UDP health summary",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|extend Detail=case(Mode==\"UDP via TURN\",\"UDP via TURN (relay)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"1\",\"UDP direct (managed/private)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"2\",\"UDP direct (public/STUN)\",Mode==\"UDP direct\",\"UDP direct (evidence-based)\",Mode==\"TCP fallback\",\"TCP fallback\",\"Unknown\")|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|summarize Sessions=count() by Detail|order by Sessions desc",
+        "size": 1,
+        "title": "Transport outcome",
+        "noDataMessage": "No transport outcomes were found.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "piechart"
+      },
+      "customWidth": "35",
+      "name": "Transport outcome",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|extend Detail=case(Mode==\"UDP via TURN\",\"UDP via TURN (relay)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"1\",\"UDP direct (managed/private)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"2\",\"UDP direct (public/STUN)\",Mode==\"UDP direct\",\"UDP direct (evidence-based)\",Mode==\"TCP fallback\",\"TCP fallback\",\"Unknown\")|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|summarize Sessions=count() by bin(TimeGenerated,{TimeRange:grain}),Detail|order by TimeGenerated asc",
+        "size": 1,
+        "title": "Session transport trend",
+        "noDataMessage": "No trend data was found.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "timechart"
+      },
+      "customWidth": "65",
+      "name": "Session transport trend",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=materialize(WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize T=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),S=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),W=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId);let C=materialize(WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend Mode=case(TransportType =~ \"TURN\" or T>0 or tostring(UdpUse) == \"4\",\"TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or S>0,\"Direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or W>0,\"TCP\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName),SessionHost=iff(isempty(SessionHostName),\"Unknown\",SessionHostName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool),Transport=case(Mode==\"TURN\",\"UDP via TURN\",Mode==\"Direct\",\"UDP direct\",Mode==\"TCP\",\"TCP fallback\",\"Unknown\")|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Transport in ({TransportFilter}))|project CorrelationId,HostPool,SessionHost,UserName,Mode,UdpUse);let Mix=C|summarize Sessions=count(),Users=dcount(UserName),Direct=countif(Mode==\"Direct\"),ManagedDirect=countif(Mode==\"Direct\" and tostring(UdpUse)==\"1\"),PublicDirect=countif(Mode==\"Direct\" and tostring(UdpUse)==\"2\"),Relayed=countif(Mode==\"TURN\"),TCP=countif(Mode==\"TCP\"),Unknown=countif(Mode==\"Unknown\") by HostPool,SessionHost|extend OtherDirect=Direct-ManagedDirect-PublicDirect|extend Direct_UDP_Pct=round(100.0*Direct/iff(Sessions==0,1,Sessions),1),ManagedDirect_Pct=round(100.0*ManagedDirect/iff(Sessions==0,1,Sessions),1),PublicDirect_Pct=round(100.0*PublicDirect/iff(Sessions==0,1,Sessions),1),OtherDirect_Pct=round(100.0*OtherDirect/iff(Sessions==0,1,Sessions),1),Relayed_UDP_Pct=round(100.0*Relayed/iff(Sessions==0,1,Sessions),1),TCP_Pct=round(100.0*TCP/iff(Sessions==0,1,Sessions),1),Unknown_Pct=round(100.0*Unknown/iff(Sessions==0,1,Sessions),1);let Bandwidth=WVDConnectionNetworkData|where TimeGenerated {TimeRange}|join kind=inner (C|project CorrelationId,HostPool,SessionHost) on CorrelationId|summarize SampledSessions=dcount(CorrelationId),AvgBandwidthMbps=round(avg(EstAvailableBandwidthKBps)*8.0/1000,2),P10BandwidthMbps=round(percentile(EstAvailableBandwidthKBps,10)*8.0/1000,2) by HostPool,SessionHost;Mix|join kind=leftouter Bandwidth on HostPool,SessionHost|extend SampledSessions=coalesce(SampledSessions,long(0))|extend NetworkCoverage_Pct=round(100.0*SampledSessions/iff(Sessions==0,1,Sessions),1)|project HostPool,SessionHost,Sessions,Users,Direct_UDP_Pct,ManagedDirect_Pct,PublicDirect_Pct,OtherDirect_Pct,Relayed_UDP_Pct,TCP_Pct,Unknown_Pct,NetworkCoverage_Pct,AvgBandwidthMbps,P10BandwidthMbps|order by TCP_Pct desc,Unknown_Pct desc,Sessions desc",
+        "size": 0,
+        "title": "Transport and bandwidth by session host",
+        "description": "One row per session host, for connected sessions matching the current filters. Sorted with the most TCP Fallback % and Unknown Transport % first, since those are the sessions most worth investigating. Direct UDP % is the total of three sub-paths shown separately: Direct via Managed/Private Network % (ExpressRoute or VPN, documented UdpUse=1), Direct via Public Network (STUN) % (direct over the internet, documented UdpUse=2), and Direct UDP - Unspecified % (Shortpath evidence present but no documented UdpUse=1/2 code recorded — these three always add up to Direct UDP %). Relayed via TURN % means UDP succeeded but was relayed through a Microsoft TURN server. Network Telemetry Coverage % is the share of this host's sessions that have at least one RTT/bandwidth sample — if it is low, the Average Bandwidth and P10 Bandwidth columns are based on only a small, possibly unrepresentative, subset of the sessions counted.",
+        "noDataMessage": "No host-pool data was found.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 1000,
+          "labelSettings": [
+            {
+              "columnId": "HostPool",
+              "label": "Host pool"
+            },
+            {
+              "columnId": "SessionHost",
+              "label": "Session host"
+            },
+            {
+              "columnId": "Sessions",
+              "label": "Sessions",
+              "width": "8ch"
+            },
+            {
+              "columnId": "Users",
+              "label": "Users",
+              "width": "8ch"
+            },
+            {
+              "columnId": "Direct_UDP_Pct",
+              "label": "Direct UDP %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "ManagedDirect_Pct",
+              "label": "Direct via Managed/Private Network %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "PublicDirect_Pct",
+              "label": "Direct via Public Network (STUN) %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "OtherDirect_Pct",
+              "label": "Direct UDP - Unspecified %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "Relayed_UDP_Pct",
+              "label": "Relayed via TURN %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "TCP_Pct",
+              "label": "TCP Fallback %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "Unknown_Pct",
+              "label": "Unknown Transport %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "NetworkCoverage_Pct",
+              "label": "Network Telemetry Coverage %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgBandwidthMbps",
+              "label": "Average Bandwidth (Mbps)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "P10BandwidthMbps",
+              "label": "P10 Bandwidth (Mbps)",
+              "width": "12ch"
+            }
+          ]
+        }
+      },
+      "name": "Session host transport and bandwidth",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;WVDConnections|where TimeGenerated {TimeRange}|summarize ConnectedAt=minif(TimeGenerated,State==\"Connected\"),DisconnectedAt=minif(TimeGenerated,State in~ (\"Disconnected\",\"Completed\",\"Canceled\",\"Cancelled\",\"Failed\",\"SessionEnded\")),arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse)==\"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|extend DurationMinutes=iff(isnotempty(ConnectedAt) and isnotempty(DisconnectedAt),datetime_diff('minute',DisconnectedAt,ConnectedAt),long(null))|summarize Sessions=count(),DisconnectedSessions=countif(isnotempty(DisconnectedAt)),AvgConnectedHours=round(avg(DurationMinutes)/60.0,2),P95ConnectedHours=round(percentile(DurationMinutes,95)/60.0,2) by HostPool,Mode|order by HostPool asc,AvgConnectedHours desc",
+        "size": 0,
+        "title": "Average connected time by host pool",
+        "description": "Shows average and P95 connected time for sessions grouped by host pool and protocol, for a quick per-host-pool read of how UDP direct/TURN/TCP fallback compare without going down to individual session hosts. Sessions counts only the connections using that row's protocol within that host pool -- add up every protocol row for one host pool to get its overall session count, since each host pool normally has one row per protocol it saw. Use this with Transport and bandwidth by session host above: a host pool where TCP fallback's average connected time is much shorter than UDP's is worth drilling into with that more detailed table to find which specific session host is driving it. Duration values require both a Connected and a disconnect event, so disconnected session counts show the coverage behind the averages.",
+        "noDataMessage": "No connected session duration data was found for the selected filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 1000,
+          "labelSettings": [
+            {
+              "columnId": "HostPool",
+              "label": "Host pool"
+            },
+            {
+              "columnId": "Mode",
+              "label": "Protocol"
+            },
+            {
+              "columnId": "Sessions",
+              "label": "Sessions (this protocol)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "DisconnectedSessions",
+              "label": "Disconnected sessions (duration known)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "AvgConnectedHours",
+              "label": "Avg connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "P95ConnectedHours",
+              "label": "P95 connected time (hr)",
+              "width": "14ch"
+            }
+          ]
+        }
+      },
+      "name": "Average connected time by host pool",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=materialize(WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend HasTurn=coalesce(HasTurn,long(0)),HasShort=coalesce(HasShort,long(0)),HasWeb=coalesce(HasWeb,long(0))|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|project CorrelationId,Gateway,Mode,UdpUse,UserName);let Mix=C|summarize Sessions=count(),Users=dcount(UserName),Direct=countif(Mode==\"UDP direct\"),ManagedDirect=countif(Mode==\"UDP direct\" and tostring(UdpUse)==\"1\"),PublicDirect=countif(Mode==\"UDP direct\" and tostring(UdpUse)==\"2\"),Relayed=countif(Mode==\"UDP via TURN\"),TCP=countif(Mode==\"TCP fallback\"),Unknown=countif(Mode==\"Unknown\") by Gateway|extend Direct_UDP_Pct=round(100.0*Direct/iff(Sessions==0,1,Sessions),1),ManagedDirect_Pct=round(100.0*ManagedDirect/iff(Sessions==0,1,Sessions),1),PublicDirect_Pct=round(100.0*PublicDirect/iff(Sessions==0,1,Sessions),1),Relayed_UDP_Pct=round(100.0*Relayed/iff(Sessions==0,1,Sessions),1),TCP_Pct=round(100.0*TCP/iff(Sessions==0,1,Sessions),1),Unknown_Pct=round(100.0*Unknown/iff(Sessions==0,1,Sessions),1);let Bandwidth=WVDConnectionNetworkData|where TimeGenerated {TimeRange}|join kind=inner (C|project CorrelationId,Gateway) on CorrelationId|summarize SampledSessions=dcount(CorrelationId),AvgRTTms=round(avg(EstRoundTripTimeInMs),1),AvgBandwidthMbps=round(avg(EstAvailableBandwidthKBps)*8.0/1000,2) by Gateway;Mix|join kind=leftouter Bandwidth on Gateway|extend SampledSessions=coalesce(SampledSessions,long(0))|extend NetworkCoverage_Pct=round(100.0*SampledSessions/iff(Sessions==0,1,Sessions),1)|project Gateway,Sessions,Users,Direct_UDP_Pct,ManagedDirect_Pct,PublicDirect_Pct,Relayed_UDP_Pct,TCP_Pct,Unknown_Pct,NetworkCoverage_Pct,AvgRTTms,AvgBandwidthMbps|order by TCP_Pct desc,Unknown_Pct desc,Sessions desc",
+        "size": 0,
+        "title": "Transport mix by gateway region",
+        "description": "One row per RDP Shortpath gateway region, for connected sessions matching the current filters. This is the network-path counterpart to 'Transport and bandwidth by session host': that table tells you if a specific session host is the problem, this one tells you if a specific Azure gateway region's edge/TURN infrastructure or backbone path is the problem. A gateway region with a much higher TCP Fallback % or Unknown %, or a noticeably higher RTT / lower bandwidth than the others, points at a regional network issue rather than anything on the session host or client side. Network Telemetry Coverage % is the share of that region's sessions with at least one RTT/bandwidth sample.",
+        "noDataMessage": "No gateway region data was found for the selected filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 1000,
+          "labelSettings": [
+            {
+              "columnId": "Gateway",
+              "label": "Gateway region"
+            },
+            {
+              "columnId": "Sessions",
+              "label": "Sessions",
+              "width": "8ch"
+            },
+            {
+              "columnId": "Users",
+              "label": "Users",
+              "width": "8ch"
+            },
+            {
+              "columnId": "Direct_UDP_Pct",
+              "label": "Direct UDP %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "ManagedDirect_Pct",
+              "label": "Direct via Managed/Private Network %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "PublicDirect_Pct",
+              "label": "Direct via Public Network (STUN) %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "Relayed_UDP_Pct",
+              "label": "Relayed via TURN %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "TCP_Pct",
+              "label": "TCP Fallback %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "Unknown_Pct",
+              "label": "Unknown Transport %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "NetworkCoverage_Pct",
+              "label": "Network Telemetry Coverage %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgRTTms",
+              "label": "Avg RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgBandwidthMbps",
+              "label": "Avg bandwidth (Mbps)",
+              "width": "12ch"
+            }
+          ]
+        }
+      },
+      "name": "Transport mix by gateway region",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize T=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),S=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),W=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend Mode=case(TransportType =~ \"TURN\" or T>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or S>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or W>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|extend Detail=case(Mode==\"UDP via TURN\",\"UDP via TURN (relay)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"1\",\"UDP direct (managed/private)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"2\",\"UDP direct (public/STUN)\",Mode==\"UDP direct\",\"UDP direct (evidence-based)\",Mode==\"TCP fallback\",\"TCP fallback\",\"Unknown\")|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|project CorrelationId,Detail;WVDConnectionNetworkData|where TimeGenerated {TimeRange}|join kind=inner C on CorrelationId|summarize AvgRTTms=round(avg(EstRoundTripTimeInMs),1) by bin(TimeGenerated,{TimeRange:grain}),Detail|order by TimeGenerated asc",
+        "size": 1,
+        "title": "RTT trend by protocol (lower is better)",
+        "description": "Tracks average round-trip time in milliseconds over time, one line per transport sub-type (managed/private direct, public/STUN direct, TURN relay, TCP fallback, or Unknown), from WVDConnectionNetworkData samples for sessions matching the current filters. Use this to see whether a protocol's latency is stable, improving, or degrading across the selected time range — a single-point average can hide a protocol that was fine yesterday but is getting worse now. Pair with the bandwidth trend to the right and the 'Protocol comparison' table below for the full point-in-time picture.",
+        "noDataMessage": "No RTT samples were correlated to the filtered sessions.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "timechart",
+        "chartSettings": {
+          "xAxis": "TimeGenerated",
+          "yAxis": [
+            "AvgRTTms"
+          ],
+          "group": "Detail",
+          "showLegend": true,
+          "seriesLabelSettings": [
+            {
+              "seriesName": "AvgRTTms",
+              "label": "Avg RTT (ms)"
+            }
+          ]
+        }
+      },
+      "customWidth": "50",
+      "name": "RTT trend by protocol",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize T=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),S=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),W=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend Mode=case(TransportType =~ \"TURN\" or T>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or S>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or W>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|extend Detail=case(Mode==\"UDP via TURN\",\"UDP via TURN (relay)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"1\",\"UDP direct (managed/private)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"2\",\"UDP direct (public/STUN)\",Mode==\"UDP direct\",\"UDP direct (evidence-based)\",Mode==\"TCP fallback\",\"TCP fallback\",\"Unknown\")|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|project CorrelationId,Detail;WVDConnectionNetworkData|where TimeGenerated {TimeRange}|join kind=inner C on CorrelationId|summarize AvgBandwidthMbps=round(avg(EstAvailableBandwidthKBps)*8.0/1000,2) by bin(TimeGenerated,{TimeRange:grain}),Detail|order by TimeGenerated asc",
+        "size": 1,
+        "title": "Bandwidth trend by protocol (higher is better)",
+        "description": "Tracks average estimated available bandwidth in Mbps over time, one line per transport sub-type (managed/private direct, public/STUN direct, TURN relay, TCP fallback, or Unknown), from WVDConnectionNetworkData samples for sessions matching the current filters. Use this alongside the RTT trend to the left to see whether a protocol's speed is holding steady or dropping off at particular times — a protocol that looks fine on average in the 'Protocol comparison' table below may still have a bandwidth dip during business hours that this trend will reveal.",
+        "noDataMessage": "No bandwidth samples were correlated to the filtered sessions.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "timechart",
+        "chartSettings": {
+          "xAxis": "TimeGenerated",
+          "yAxis": [
+            "AvgBandwidthMbps"
+          ],
+          "group": "Detail",
+          "showLegend": true,
+          "seriesLabelSettings": [
+            {
+              "seriesName": "AvgBandwidthMbps",
+              "label": "Avg bandwidth (Mbps)"
+            }
+          ]
+        }
+      },
+      "customWidth": "50",
+      "name": "Bandwidth trend by protocol",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=materialize(WVDConnections|where TimeGenerated {TimeRange}|summarize ConnectedAt=minif(TimeGenerated,State==\"Connected\"),DisconnectedAt=minif(TimeGenerated,State in~ (\"Disconnected\",\"Completed\",\"Canceled\",\"Cancelled\",\"Failed\",\"SessionEnded\")),arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend HasTurn=coalesce(HasTurn,long(0)),HasShort=coalesce(HasShort,long(0)),HasWeb=coalesce(HasWeb,long(0))|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|extend DurationMinutes=iff(isnotempty(ConnectedAt) and isnotempty(DisconnectedAt),datetime_diff('minute',DisconnectedAt,ConnectedAt),long(null))|project CorrelationId,Mode,DurationMinutes);let DurationStats=C|summarize Sessions=count(),DisconnectedSessions=countif(isnotempty(DurationMinutes)),AvgConnectedHours=round(avg(DurationMinutes)/60.0,2),MedianConnectedHours=round(percentile(DurationMinutes,50)/60.0,2),P95ConnectedHours=round(percentile(DurationMinutes,95)/60.0,2) by Mode;let NetworkStats=WVDConnectionNetworkData|where TimeGenerated {TimeRange}|join kind=inner C on CorrelationId|summarize NetworkSessions=dcount(CorrelationId),NetworkSamples=count(),AvgRTTms=round(avg(EstRoundTripTimeInMs),1),P95RTTms=round(percentile(EstRoundTripTimeInMs,95),1),AvgBandwidthMbps=round(avg(EstAvailableBandwidthKBps)*8.0/1000,2),P10BandwidthMbps=round(percentile(EstAvailableBandwidthKBps,10)*8.0/1000,2) by Mode;DurationStats|join kind=leftouter NetworkStats on Mode|extend NetworkSessions=coalesce(NetworkSessions,long(0))|extend NetworkCoverage_Pct=round(100.0*NetworkSessions/iff(Sessions==0,1,Sessions),1)|project Protocol=Mode,Sessions,DisconnectedSessions,AvgConnectedHours,MedianConnectedHours,P95ConnectedHours,NetworkCoverage_Pct,AvgRTTms,P95RTTms,AvgBandwidthMbps,P10BandwidthMbps|order by AvgConnectedHours desc",
+        "size": 0,
+        "title": "Protocol comparison: which is faster and more stable",
+        "description": "One row per protocol (UDP direct, UDP via TURN, TCP fallback, Unknown) for sessions matching the current filters, combining connected time, RTT, and bandwidth side-by-side so you don't have to cross-reference three separate charts. To judge stability, compare Avg/Median/P95 connected time (hr) — a protocol with much shorter connected time and a P95 far above its average is dropping sessions early or inconsistently. To judge speed, compare Avg/P10 bandwidth (Mbps) and Avg/P95 RTT (ms) — higher bandwidth and lower RTT is better; a low P10 bandwidth or high P95 RTT relative to the average means a meaningful share of that protocol's sessions are struggling even if the average looks fine. Network telemetry coverage % shows what share of that protocol's sessions actually had a network sample — treat RTT/bandwidth figures cautiously if this is low. In short: the protocol with the highest connected time, highest bandwidth, and lowest RTT is both the most stable and the fastest for this filter selection.",
+        "noDataMessage": "No connected session duration or network data was found for the selected filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 100,
+          "labelSettings": [
+            {
+              "columnId": "Protocol",
+              "label": "Protocol"
+            },
+            {
+              "columnId": "Sessions",
+              "label": "Sessions",
+              "width": "8ch"
+            },
+            {
+              "columnId": "DisconnectedSessions",
+              "label": "Sessions w/ known duration",
+              "width": "14ch"
+            },
+            {
+              "columnId": "AvgConnectedHours",
+              "label": "Avg connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "MedianConnectedHours",
+              "label": "Median connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "P95ConnectedHours",
+              "label": "P95 connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "NetworkCoverage_Pct",
+              "label": "Network telemetry coverage %",
+              "width": "12ch"
+            },
+            {
+              "columnId": "AvgRTTms",
+              "label": "Avg RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "P95RTTms",
+              "label": "P95 RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgBandwidthMbps",
+              "label": "Avg bandwidth (Mbps)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "P10BandwidthMbps",
+              "label": "P10 bandwidth (Mbps)",
+              "width": "12ch"
+            }
+          ]
+        }
+      },
+      "name": "Protocol comparison stability and speed",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize T=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),S=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),W=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=WVDConnections|where TimeGenerated {TimeRange}|summarize arg_max(TimeGenerated,*),ConnectedAt=minif(TimeGenerated,State==\"Connected\") by CorrelationId|join kind=leftouter L on CorrelationId|extend T=coalesce(T,long(0)),S=coalesce(S,long(0)),W=coalesce(W,long(0))|extend Transport=case(TransportType =~ \"TURN\" or T>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or S>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or W>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Transport in ({TransportFilter}))|project CorrelationId;WVDErrors|where TimeGenerated {TimeRange}|extend Error=iff(isempty(CodeSymbolic),strcat(\"Error \" ,tostring(Code)),CodeSymbolic),Origin=iff(ServiceError==true,\"Microsoft service\",\"Environment/configuration\")|join kind=inner C on CorrelationId|summarize AffectedAttempts=dcount(CorrelationId) by Error,Origin|top 10 by AffectedAttempts desc",
+        "size": 1,
+        "title": "Top errors by affected connection attempts",
+        "description": "Each bar is one WVDErrors error code (CodeSymbolic, or numeric Code if no symbolic name is available). Bar height is the number of distinct connection attempts (CorrelationId) that hit that error at least once, for sessions matching the current filters — not the raw event count, so one noisy retrying session cannot inflate the ranking. Color is the documented ServiceError field, split into two categories: red (Microsoft service) means the error originated inside Microsoft's AVD service and is not caused by the customer's network or configuration; orange (Environment/configuration) means the error originated on the customer side — client device, local network, firewall, DNS, or host pool/policy settings. Only the top 10 codes by affected attempts are shown.",
+        "noDataMessage": "No connection errors match the selected filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "categoricalbar",
+        "chartSettings": {
+          "xAxis": "Error",
+          "yAxis": [
+            "AffectedAttempts"
+          ],
+          "group": "Origin",
+          "showLegend": true,
+          "seriesLabelSettings": [
+            {
+              "seriesName": "Microsoft service",
+              "label": "Microsoft service",
+              "color": "red"
+            },
+            {
+              "seriesName": "Environment/configuration",
+              "label": "Environment/configuration",
+              "color": "orange"
+            }
+          ]
+        }
+      },
+      "name": "Top errors by affected attempts",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=materialize(WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize T=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),S=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),W=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId);let C=materialize(WVDConnections|where TimeGenerated {TimeRange}|summarize arg_max(TimeGenerated,*),StartedAt=minif(TimeGenerated,State==\"Started\"),ConnectedAt=minif(TimeGenerated,State==\"Connected\"),DisconnectedAt=minif(TimeGenerated,State in~ (\"Disconnected\",\"Completed\",\"Canceled\",\"Cancelled\",\"Failed\",\"SessionEnded\")) by CorrelationId|join kind=leftouter L on CorrelationId|extend T=coalesce(T,long(0)),S=coalesce(S,long(0)),W=coalesce(W,long(0))|extend Transport=case(TransportType =~ \"TURN\" or T>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or S>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or W>0,\"TCP fallback\",\"Unknown\"),Outcome=iff(isnotempty(ConnectedAt),\"Connected\",\"Not connected\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName),ClientIP=iff(isempty(ClientSideIPAddress),\"Unknown\",ClientSideIPAddress),SessionHost=iff(isempty(SessionHostName),\"Unknown\",SessionHostName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool),DurationMinutes=iff(isnotempty(ConnectedAt) and isnotempty(DisconnectedAt),datetime_diff('minute',DisconnectedAt,ConnectedAt),long(null))|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Transport in ({TransportFilter}))|project CorrelationId,Outcome,Transport,User,ClientIP,HostPool,Gateway,SessionHost,DurationMinutes);let ErrorGroups=WVDErrors|where TimeGenerated {TimeRange}|extend Category=case(ActivityType has \"Host\" or Operation has \"Registration\",\"Host or agent\",ActivityType has \"Connection\" or Operation has \"Connection\",\"Connection setup\",ActivityType has \"Management\",\"Resource management\",ActivityType has \"Feed\",\"Workspace or assignment\",\"Other AVD activity\"),Issue=iff(isempty(CodeSymbolic),strcat(\"Error \" ,tostring(Code)),CodeSymbolic)|join kind=inner C on CorrelationId|summarize Errors=count(),AffectedAttempts=dcount(CorrelationId),ServiceErrors=countif(ServiceError==true),Issues=make_set(Issue,10),Messages=make_set(Message,5),Categories=make_set(Category,5),Sources=make_set(Source,5),HostPools=make_set(HostPool,10),SessionHosts=make_set(SessionHost,10),Gateways=make_set(Gateway,10),AvgConnectedHours=round(avg(DurationMinutes)/60.0,2),P95ConnectedHours=round(percentile(DurationMinutes,95)/60.0,2),LastSeen=max(TimeGenerated),SampleCorrelationIds=make_set(CorrelationId,5) by User,ClientIP,Outcome,Transport;let TopErrorsPerGroup=WVDErrors|where TimeGenerated {TimeRange}|extend Issue=iff(isempty(CodeSymbolic),strcat(\"Error \" ,tostring(Code)),CodeSymbolic)|join kind=inner C on CorrelationId|summarize IssueCount=count() by User,ClientIP,Outcome,Transport,Issue|order by User asc,ClientIP asc,Outcome asc,Transport asc,IssueCount desc|summarize TopErrorsList=make_list(strcat(Issue,\" (\",tostring(IssueCount),\")\"),5) by User,ClientIP,Outcome,Transport|extend TopErrors=strcat_array(TopErrorsList,\", \")|project User,ClientIP,Outcome,Transport,TopErrors;let NetworkGroups=WVDConnectionNetworkData|where TimeGenerated {TimeRange}|join kind=inner C on CorrelationId|summarize NetworkSessions=dcount(CorrelationId),NetworkSamples=count(),AvgRTTms=round(avg(EstRoundTripTimeInMs),1),P95RTTms=round(percentile(EstRoundTripTimeInMs,95),1),AvgBandwidthMbps=round(avg(EstAvailableBandwidthKBps)*8.0/1000,2),P10BandwidthMbps=round(percentile(EstAvailableBandwidthKBps,10)*8.0/1000,2) by User,ClientIP,Outcome,Transport;ErrorGroups|join kind=leftouter NetworkGroups on User,ClientIP,Outcome,Transport|join kind=leftouter TopErrorsPerGroup on User,ClientIP,Outcome,Transport|extend NetworkSessions=coalesce(NetworkSessions,long(0)),NetworkSamples=coalesce(NetworkSamples,long(0)),TopErrors=iff(isempty(TopErrors),\"None\",TopErrors)|top 50 by Errors desc|project User,ClientIP,Outcome,Transport,Errors,AffectedAttempts,ServiceErrors,AvgConnectedHours,P95ConnectedHours,TopErrors,Issues,Messages,Categories,Sources,HostPools,SessionHosts,Gateways,NetworkSessions,NetworkSamples,AvgRTTms,P95RTTms,AvgBandwidthMbps,P10BandwidthMbps,LastSeen,SampleCorrelationIds",
+        "size": 0,
+        "title": "Which users/devices are hitting errors, and their network conditions",
+        "description": "Groups WVDErrors events by user, client IP, connection outcome, and transport to reveal repeat offenders instead of a flat error list -- each row is one user+device+outcome+transport combination, with its error count, error codes, average/P95 connected time in hours, and correlated network RTT/bandwidth so you can tell whether errors are coinciding with poor connectivity or short-lived sessions. Many affected attempts plus a short Avg connected time is a stronger disconnect pattern than repeated messages from one long session. Top errors lists up to the 5 most frequent error codes for that row with their counts (most frequent first); Messages shows up to 5 distinct raw WVDErrors message strings, since the same code can carry different message text depending on context.",
+        "noDataMessage": "No connection errors match the selected filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 100,
+          "labelSettings": [
+            {
+              "columnId": "ClientIP",
+              "label": "Client IP"
+            },
+            {
+              "columnId": "AffectedAttempts",
+              "label": "Affected attempts",
+              "width": "10ch"
+            },
+            {
+              "columnId": "ServiceErrors",
+              "label": "Microsoft service errors",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgConnectedHours",
+              "label": "Avg connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "P95ConnectedHours",
+              "label": "P95 connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "TopErrors",
+              "label": "Top errors"
+            },
+            {
+              "columnId": "Messages",
+              "label": "Sample messages"
+            },
+            {
+              "columnId": "SessionHosts",
+              "label": "Session hosts"
+            },
+            {
+              "columnId": "NetworkSessions",
+              "label": "Network sessions",
+              "width": "10ch"
+            },
+            {
+              "columnId": "NetworkSamples",
+              "label": "Network samples",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgRTTms",
+              "label": "Avg RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "P95RTTms",
+              "label": "P95 RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgBandwidthMbps",
+              "label": "Avg bandwidth (Mbps)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "P10BandwidthMbps",
+              "label": "P10 bandwidth (Mbps)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "LastSeen",
+              "label": "Last seen",
+              "width": "16ch"
+            }
+          ]
+        }
+      },
+      "name": "Grouped connection errors",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=materialize(WVDConnections|where TimeGenerated {TimeRange}|summarize ConnectedAt=minif(TimeGenerated,State==\"Connected\"),DisconnectedAt=minif(TimeGenerated,State in~ (\"Disconnected\",\"Completed\",\"Canceled\",\"Cancelled\",\"Failed\",\"SessionEnded\")),arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend HasTurn=coalesce(HasTurn,long(0)),HasShort=coalesce(HasShort,long(0)),HasWeb=coalesce(HasWeb,long(0))|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|extend DurationMinutes=iff(isnotempty(ConnectedAt) and isnotempty(DisconnectedAt),datetime_diff('minute',DisconnectedAt,ConnectedAt),long(null))|project CorrelationId,User,HostPool,Gateway,Mode,DurationMinutes);let DurationStats=C|summarize Sessions=count(),DisconnectedSessions=countif(isnotempty(DurationMinutes)),AvgConnectedHours=round(avg(DurationMinutes)/60.0,2),MedianConnectedHours=round(percentile(DurationMinutes,50)/60.0,2),P95ConnectedHours=round(percentile(DurationMinutes,95)/60.0,2) by User,Mode;let NetworkStats=WVDConnectionNetworkData|where TimeGenerated {TimeRange}|join kind=inner C on CorrelationId|summarize NetworkSessions=dcount(CorrelationId),NetworkSamples=count(),AvgRTTms=round(avg(EstRoundTripTimeInMs),1),P95RTTms=round(percentile(EstRoundTripTimeInMs,95),1),AvgBandwidthMbps=round(avg(EstAvailableBandwidthKBps)*8.0/1000,2),P10BandwidthMbps=round(percentile(EstAvailableBandwidthKBps,10)*8.0/1000,2) by User,Mode;DurationStats|join kind=leftouter NetworkStats on User,Mode|extend NetworkSessions=coalesce(NetworkSessions,long(0)),NetworkSamples=coalesce(NetworkSamples,long(0))|extend NetworkCoverage_Pct=round(100.0*NetworkSessions/iff(Sessions==0,1,Sessions),1)|project User,Protocol=Mode,Sessions,DisconnectedSessions,AvgConnectedHours,MedianConnectedHours,P95ConnectedHours,NetworkCoverage_Pct,AvgRTTms,P95RTTms,AvgBandwidthMbps,P10BandwidthMbps|order by User asc,Sessions desc",
+        "size": 0,
+        "title": "Average connected time and bandwidth by user and protocol",
+        "description": "The core per-user, per-protocol deep-dive: one row for every user + transport (UDP direct, UDP via TURN, TCP fallback, or Unknown) combination seen in the current filters, covering ALL sessions (not just erroring ones). Sessions (this protocol) counts only this user's connections using that row's protocol -- add up all of a user's protocol rows to get their overall session count. Sessions w/ known duration is the subset of that row with both a Connected and disconnect event, so a duration could be computed. Avg/Median/P95 connected time (hr) show how long that user typically stays connected on that specific protocol — a much shorter time on TCP fallback vs UDP for the same user is a strong signal that the TCP path is less stable for them. Avg/P10 bandwidth (Mbps) and Avg/P95 RTT (ms) come from correlated WVDConnectionNetworkData samples for that user+protocol; Network telemetry coverage % is the share of that row's sessions that actually had at least one sample, so a low coverage % means the bandwidth/RTT figures rest on a small subset. Use this table to answer 'is this user's UDP faster/more stable than their TCP fallback?' and to spot users who are consistently slow or short-lived on a given protocol.",
+        "noDataMessage": "No sessions match the current filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 5000,
+          "labelSettings": [
+            {
+              "columnId": "User",
+              "label": "User"
+            },
+            {
+              "columnId": "Protocol",
+              "label": "Protocol"
+            },
+            {
+              "columnId": "Sessions",
+              "label": "Sessions (this protocol)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "DisconnectedSessions",
+              "label": "Sessions w/ known duration",
+              "width": "12ch"
+            },
+            {
+              "columnId": "AvgConnectedHours",
+              "label": "Avg connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "MedianConnectedHours",
+              "label": "Median connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "P95ConnectedHours",
+              "label": "P95 connected time (hr)",
+              "width": "14ch"
+            },
+            {
+              "columnId": "NetworkCoverage_Pct",
+              "label": "Network telemetry coverage %",
+              "width": "12ch"
+            },
+            {
+              "columnId": "AvgRTTms",
+              "label": "Avg RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "P95RTTms",
+              "label": "P95 RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgBandwidthMbps",
+              "label": "Avg bandwidth (Mbps)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "P10BandwidthMbps",
+              "label": "P10 bandwidth (Mbps)",
+              "width": "12ch"
+            }
+          ]
+        },
+        "sortBy": [
+          {
+            "itemKey": "User",
+            "sortOrder": 1
+          },
+          {
+            "itemKey": "Sessions",
+            "sortOrder": 2
+          }
+        ]
+      },
+      "name": "User protocol connected time and bandwidth",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=materialize(WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend HasTurn=coalesce(HasTurn,long(0)),HasShort=coalesce(HasShort,long(0)),HasWeb=coalesce(HasWeb,long(0))|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool),ClientOS=iff(isempty(ClientOS),\"Unknown\",ClientOS),ClientType=iff(isempty(ClientType),\"Unknown\",ClientType)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|project CorrelationId,ClientOS,ClientType,ClientVersion,Mode,UserName);let Mix=C|summarize Sessions=count(),Users=dcount(UserName),Direct=countif(Mode==\"UDP direct\"),Relayed=countif(Mode==\"UDP via TURN\"),TCP=countif(Mode==\"TCP fallback\"),Unknown=countif(Mode==\"Unknown\"),ClientVersions=make_set(ClientVersion,5) by ClientOS,ClientType|extend Direct_UDP_Pct=round(100.0*Direct/iff(Sessions==0,1,Sessions),1),Relayed_UDP_Pct=round(100.0*Relayed/iff(Sessions==0,1,Sessions),1),TCP_Pct=round(100.0*TCP/iff(Sessions==0,1,Sessions),1),Unknown_Pct=round(100.0*Unknown/iff(Sessions==0,1,Sessions),1);let NetStats=WVDConnectionNetworkData|where TimeGenerated {TimeRange}|join kind=inner C on CorrelationId|summarize AvgRTTms=round(avg(EstRoundTripTimeInMs),1),AvgBandwidthMbps=round(avg(EstAvailableBandwidthKBps)*8.0/1000,2) by ClientOS,ClientType;Mix|join kind=leftouter NetStats on ClientOS,ClientType|project ClientOS,ClientType,Sessions,Users,Direct_UDP_Pct,Relayed_UDP_Pct,TCP_Pct,Unknown_Pct,AvgRTTms,AvgBandwidthMbps,ClientVersions|order by TCP_Pct desc,Sessions desc",
+        "size": 0,
+        "title": "Transport mix by client OS and version",
+        "description": "One row per client operating system + client type (e.g. Windows Desktop client, Windows Store client, macOS, iOS, Android, Web/HTML5), for connected sessions matching the current filters. This is the client-side counterpart to the host and gateway breakdowns above: RDP Shortpath requires a sufficiently recent Remote Desktop client, so a client OS/type with a much higher TCP Fallback % than the rest is a strong signal that outdated client software (or a platform with limited/no Shortpath support, such as some web/HTML5 clients) is the real root cause -- not the network or session host. Client versions lists up to 5 distinct versions seen for that OS/type so you can spot whether it's one specific old build driving the gap.",
+        "noDataMessage": "No client OS/type data was found for the selected filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 1000,
+          "labelSettings": [
+            {
+              "columnId": "ClientOS",
+              "label": "Client OS"
+            },
+            {
+              "columnId": "ClientType",
+              "label": "Client type"
+            },
+            {
+              "columnId": "Sessions",
+              "label": "Sessions",
+              "width": "8ch"
+            },
+            {
+              "columnId": "Users",
+              "label": "Users",
+              "width": "8ch"
+            },
+            {
+              "columnId": "Direct_UDP_Pct",
+              "label": "Direct UDP %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "Relayed_UDP_Pct",
+              "label": "Relayed via TURN %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "TCP_Pct",
+              "label": "TCP Fallback %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "Unknown_Pct",
+              "label": "Unknown Transport %",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgRTTms",
+              "label": "Avg RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgBandwidthMbps",
+              "label": "Avg bandwidth (Mbps)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "ClientVersions",
+              "label": "Client versions"
+            }
+          ]
+        }
+      },
+      "name": "Transport mix by client OS and version",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=materialize(WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter}))|project CorrelationId,User,HostPool,Gateway,Mode,TimeGenerated);let UserSummary=C|summarize Sessions=count(),UdpSessions=countif(Mode in (\"UDP direct\",\"UDP via TURN\")),TcpSessions=countif(Mode==\"TCP fallback\"),UnknownSessions=countif(Mode==\"Unknown\"),HostPools=make_set(HostPool,5),Gateways=make_set(Gateway,5),LastSeen=max(TimeGenerated) by User|where UdpSessions==0;let UserErrorCounts=WVDErrors|where TimeGenerated {TimeRange}|extend Issue=iff(isempty(CodeSymbolic),strcat(\"Error \" ,tostring(Code)),CodeSymbolic)|join kind=inner C on CorrelationId|summarize IssueCount=count() by User,Issue;let UserErrors=UserErrorCounts|summarize ErrorCount=sum(IssueCount) by User;let TopErrorsPerUser=UserErrorCounts|order by User asc,IssueCount desc|summarize TopErrorsList=make_list(strcat(Issue,\" (\",tostring(IssueCount),\")\"),5) by User|extend TopErrors=strcat_array(TopErrorsList,\", \")|project User,TopErrors;UserSummary|join kind=leftouter UserErrors on User|join kind=leftouter TopErrorsPerUser on User|extend ErrorCount=coalesce(ErrorCount,long(0)),TopErrors=iff(isempty(TopErrors),\"None\",TopErrors)|project User,Sessions,TcpSessions,UnknownSessions,ErrorCount,TopErrors,HostPools,Gateways,LastSeen|order by ErrorCount desc,Sessions desc",
+        "size": 0,
+        "title": "Users who have never had a UDP connection",
+        "description": "Lists every user (matching the Host pool/Gateway/User filters, across all transport outcomes) who has zero UDP sessions — direct or relayed via TURN — in the selected time range; every one of their sessions was TCP fallback or Unknown. Error count is the total WVDErrors events across that user's sessions in this range, and Top errors lists up to their 5 most frequent error codes with counts (most frequent first) — together these show whether the lack of UDP is coinciding with other problems or is otherwise silent. Sorted by error count first, then session count, so the most error-prone no-UDP users surface at the top. This panel intentionally ignores the Transport outcome pill, since it needs to see all of a user's sessions to determine whether UDP was ever used. A user who appears here across multiple session hosts and gateway regions (not just one) suggests a persistent client-side or network-path issue (firewall, NAT type, or Windows/Remote Desktop UDP settings) rather than a one-off network blip.",
+        "noDataMessage": "Every user matching the current filters had at least one UDP session (direct or relayed).",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 1000,
+          "labelSettings": [
+            {
+              "columnId": "User",
+              "label": "User"
+            },
+            {
+              "columnId": "Sessions",
+              "label": "Sessions",
+              "width": "8ch"
+            },
+            {
+              "columnId": "TcpSessions",
+              "label": "TCP fallback sessions",
+              "width": "10ch"
+            },
+            {
+              "columnId": "UnknownSessions",
+              "label": "Unknown sessions",
+              "width": "10ch"
+            },
+            {
+              "columnId": "ErrorCount",
+              "label": "Errors",
+              "width": "8ch"
+            },
+            {
+              "columnId": "TopErrors",
+              "label": "Top errors"
+            },
+            {
+              "columnId": "HostPools",
+              "label": "Host pools"
+            },
+            {
+              "columnId": "Gateways",
+              "label": "Gateway regions"
+            },
+            {
+              "columnId": "LastSeen",
+              "label": "Last seen",
+              "width": "16ch"
+            }
+          ]
+        }
+      },
+      "name": "Users without UDP",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize LinkCount=dcount(LinkId),ClientTransports=make_set(ClientTransportType),ServerTransports=make_set(ServerTransportType),ClientTURNIPs=make_set_if(ClientTURNIP,isnotempty(ClientTURNIP)),ServerTURNIPs=make_set_if(ServerTURNIP,isnotempty(ServerTURNIP)),T=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),S=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),W=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let N=WVDConnectionNetworkData|where TimeGenerated {TimeRange}|summarize NetworkSamples=count(),AvgRTTms=round(avg(EstRoundTripTimeInMs),1),P95RTTms=round(percentile(EstRoundTripTimeInMs,95),1),AvgBandwidthMbps=round(avg(EstAvailableBandwidthKBps)*8.0/1000,2),P10BandwidthMbps=round(percentile(EstAvailableBandwidthKBps,10)*8.0/1000,2) by CorrelationId;let E=WVDErrors|where TimeGenerated {TimeRange}|summarize ErrorCount=count(),ErrorDetails=make_set(strcat(iff(isempty(CodeSymbolic),tostring(Code),CodeSymbolic),\" | \" ,ActivityType,\" | \" ,Operation,\" | \" ,Source,\" | \" ,Message),10) by CorrelationId;WVDConnections|where TimeGenerated {TimeRange}|where State==\"Connected\"|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|join kind=leftouter N on CorrelationId|join kind=leftouter E on CorrelationId|extend T=coalesce(T,long(0)),S=coalesce(S,long(0)),W=coalesce(W,long(0)),LinkCount=coalesce(LinkCount,long(0)),NetworkSamples=coalesce(NetworkSamples,long(0)),ErrorCount=coalesce(ErrorCount,long(0))|extend Mode=case(TransportType =~ \"TURN\" or T>0 or tostring(UdpUse) == \"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or S>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or W>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool),TransportDetail=case(Mode==\"UDP via TURN\",\"Relayed (public network, TURN)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"1\",\"Direct (managed network, private)\",Mode==\"UDP direct\" and tostring(UdpUse)==\"2\",\"Direct (public network, STUN)\",Mode==\"UDP direct\",\"Direct (Shortpath/Multipath link evidence)\",Mode==\"TCP fallback\",\"TCP reverse-connect\",\"Unclassified\"),ObservedEvidence=case(Mode==\"UDP via TURN\",\"TURN transport, TURN IP, or documented UdpUse=4 present\",Mode==\"UDP direct\",\"DIRECT link, Multipath, documented UdpUse=1/2, or MultiLinkAdd evidence present without TURN\",Mode==\"TCP fallback\",\"WebSocket transport present without UDP evidence\",\"No decisive transport evidence\"),Interpretation=case(Mode==\"UDP via TURN\",\"UDP active through relay\",Mode==\"UDP direct\",\"Direct UDP Shortpath active\",Mode==\"TCP fallback\",\"Reverse-connect TCP/TLS 443 used; UDP Shortpath not established or not reported\",\"Do not assume TCP; validate diagnostic coverage\")|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|project TimeGenerated,Transport=Mode,TransportDetail,User=UserName,HostPool,Gateway,SessionHost=SessionHostName,ClientOS,ClientType,ClientVersion,ObservedEvidence,Interpretation,NetworkSamples,AvgRTTms,P95RTTms,AvgBandwidthMbps,P10BandwidthMbps,ErrorCount,ErrorDetails,CorrelationId|order by User asc,TimeGenerated desc",
+        "size": 0,
+        "title": "Session transport, RTT, and bandwidth details",
+        "description": "One row per session matching the current filters, sorted by user and then most recent session first, so every session that belongs to the same user appears together in one block instead of being scattered across the whole time range. Error details lists up to 10 raw WVDErrors entries (code | activity | operation | source | message) for that session's CorrelationId, so you don't need to cross-reference WVDErrors separately to see what actually went wrong. When 'All' users are selected there can be a lot of users to scan — use the 'Search or select user' pill in the filters above to narrow this entire table (and every other panel) down to one user's full session history.",
+        "noDataMessage": "No sessions match the current filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "rowLimit": 10000,
+          "labelSettings": [
+            {
+              "columnId": "TransportDetail",
+              "label": "Transport detail"
+            },
+            {
+              "columnId": "Interpretation",
+              "label": "What this means"
+            },
+            {
+              "columnId": "NetworkSamples",
+              "label": "Network samples",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgRTTms",
+              "label": "Avg RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "P95RTTms",
+              "label": "P95 RTT (ms)",
+              "width": "10ch"
+            },
+            {
+              "columnId": "AvgBandwidthMbps",
+              "label": "Avg bandwidth (Mbps)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "P10BandwidthMbps",
+              "label": "P10 bandwidth (Mbps)",
+              "width": "12ch"
+            },
+            {
+              "columnId": "ErrorCount",
+              "label": "Errors",
+              "width": "8ch"
+            },
+            {
+              "columnId": "ErrorDetails",
+              "label": "Error details"
+            }
+          ]
+        },
+        "sortBy": [
+          {
+            "itemKey": "User",
+            "sortOrder": 1
+          },
+          {
+            "itemKey": "TimeGenerated",
+            "sortOrder": 2
+          }
+        ]
+      },
+      "name": "Session transport evidence",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let L=WVDMultiLinkAdd|where TimeGenerated {TimeRange}|summarize HasTurn=countif(ClientTransportType =~ \"TURN\" or ServerTransportType =~ \"TURN\" or isnotempty(ClientTURNIP) or isnotempty(ServerTURNIP)),HasShort=countif(ClientTransportType in~ (\"Shortpath\",\"DIRECT\") or ServerTransportType in~ (\"Shortpath\",\"DIRECT\")),HasWeb=countif(ClientTransportType =~ \"WEBSOCKET\" or ServerTransportType =~ \"WEBSOCKET\") by CorrelationId;let C=WVDConnections|where TimeGenerated {TimeRange}|summarize arg_max(TimeGenerated,*) by CorrelationId|join kind=leftouter L on CorrelationId|extend Mode=case(TransportType =~ \"TURN\" or HasTurn>0 or tostring(UdpUse)==\"4\",\"UDP via TURN\",TransportType in~ (\"Shortpath\",\"Multipath\") or tostring(UdpUse) in (\"1\",\"2\") or HasShort>0,\"UDP direct\",TransportType in~ (\"Websocket\",\"TCP Websocket\") or HasWeb>0,\"TCP fallback\",\"Unknown\"),HostPool=extract(\"/hostpools/([^/]+)\",1,_ResourceId),Gateway=iff(isempty(GatewayRegion),\"Unknown\",GatewayRegion),User=iff(isempty(UserName),\"Unknown\",UserName)|extend HostPool=iff(isempty(HostPool),\"Unknown\",HostPool)|where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter})) and ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter})) and ('All' in ({UserFilter}) or User in ({UserFilter})) and ('All' in ({TransportFilter}) or Mode in ({TransportFilter}))|project CorrelationId;let FilteredErrors=WVDErrors|where TimeGenerated {TimeRange}|extend Error=iff(isempty(CodeSymbolic),strcat(\"Error \",tostring(Code)),CodeSymbolic),Origin=iff(ServiceError==true,\"Microsoft service\",\"Environment/configuration\")|join kind=inner C on CorrelationId;let TopErrors=FilteredErrors|summarize AffectedAttempts=dcount(CorrelationId) by Error|top 10 by AffectedAttempts desc|project Error;FilteredErrors|where Error in (TopErrors)|summarize ErrorMessages=count(),AffectedAttempts=dcount(CorrelationId) by bin(TimeGenerated,{TimeRange:grain}),Error,Origin|order by TimeGenerated asc",
+        "size": 0,
+        "title": "Error trend over time",
+        "description": "Tracks the top 10 error codes by time bucket for the selected filters. Error messages counts every correlated WVDErrors event, while affected attempts counts distinct connection attempts. Use the lines to see which errors are increasing or decreasing; a rise in affected attempts is more significant than repeated messages from one noisy attempt. The query also returns the error origin so the code can be compared with the service-versus-environment classification in the detailed error table.",
+        "noDataMessage": "No connection errors match the selected filters.",
+        "showAnalytics": true,
+        "showRefreshButton": true,
+        "showExportToExcel": true,
+        "exportToExcelOptions": "visible",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspace}"
+        ],
+        "visualization": "timechart",
+        "chartSettings": {
+          "xAxis": "TimeGenerated",
+          "yAxis": [
+            "ErrorMessages"
+          ],
+          "group": "Error",
+          "showLegend": true,
+          "seriesLabelSettings": [
+            {
+              "seriesName": "ErrorMessages",
+              "label": "Error messages"
+            }
+          ]
+        }
+      },
+      "name": "Error trend over time",
+      "styleSettings": {
+        "margin": "0",
+        "padding": "0"
+      }
+    }
+  ],
+  "fallbackResourceIds": [
+    "Azure Monitor"
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json",
+  "layout": {
+    "type": "flow"
+  }
+}
