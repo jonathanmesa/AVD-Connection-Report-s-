@@ -39,10 +39,6 @@ Enable these AVD diagnostic tables in the selected Log Analytics workspace. The 
 
 ## Workbook panel map
 
-![Azure Virtual Desktop Investigation dashboard reading order and diagnostic coverage](docs/images/avd-diagnostic-coverage.png)
-
-**Finding:** The investigation starts with the dashboard reading order and confirms WVD diagnostic coverage before interpreting risk indicators. **Scope:** Sanitized live AVD workbook view. **Next action:** Review the complaint-time network-risk panel only after the required sources are present.
-
 Use the panels in this order:
 
 1. **Diagnostic coverage and data freshness:** confirms each WVD table is present and current.
@@ -66,6 +62,37 @@ Use the panels in this order:
 19. **AVD management changes near an incident:** shows resource changes preceding a regression.
 20. **Session host provisioning and updates:** identifies configuration and deployment windows.
 21. **Autoscale occupancy and scaling decisions:** relates capacity decisions and Autoscale failures to the incident period.
+
+## Live workbook examples
+
+### Dashboard reading order and diagnostic coverage
+
+![Azure Virtual Desktop Investigation dashboard reading order and diagnostic coverage](docs/images/avd-diagnostic-coverage.png)
+
+**Finding:** The investigation starts with the dashboard reading order and confirms WVD diagnostic coverage before interpreting risk indicators. **Scope:** Sanitized live AVD workbook view. **Next action:** Review the complaint-time network-risk panel only after the required sources are present.
+
+Read the coverage table from left to right:
+
+- **Status:** `Present` means records exist in the selected time range. `Present but stale` means the latest record is older than one day. `Missing or no rows in range` means stop and verify the diagnostic setting or time range.
+- **DataSource:** the WVD table used by one or more workbook panels.
+- **Purpose:** the diagnostic question the table answers.
+- **Rows** and **LatestRecord:** evidence that the selected workspace is collecting current data, not proof that the AVD service is healthy.
+
+### Complaint-time network risk
+
+![30-minute AVD network risk at complaint time](docs/images/avd-complaint-time-network-risk.png)
+
+**Finding:** The selected live example contains high-risk and warning periods. **Scope:** Sanitized 30-minute aggregate AVD network view. **Next action:** Select the reported user and compare the matching time period with peer, host, and session evidence.
+
+Read the risk table from left to right:
+
+- **TimeBucket:** the 30-minute period to align with a reported issue.
+- **Sessions:** number of connected AVD sessions in that period. Small counts are directional, not conclusive.
+- **NetworkCoveragePct:** percentage of sessions with usable network samples. Gray/unknown below 50% means do not draw a network conclusion.
+- **P95RTTms:** the worst 5% AVD round-trip time. Above 250 ms is high risk; 120-250 ms is a warning.
+- **P10BandwidthMbps:** bandwidth seen by the lowest 10% of samples. Below 5 Mbps is high risk; 5-10 Mbps is a warning.
+- **TcpFallbackPct:** percentage of sessions without an observed UDP path. Above 50% is high risk; 20-50% is a warning.
+- **Condition:** red indicates one or more high-risk thresholds, orange indicates a warning, green indicates no threshold was met, and gray indicates insufficient coverage.
 
 ## Screenshot companion
 
