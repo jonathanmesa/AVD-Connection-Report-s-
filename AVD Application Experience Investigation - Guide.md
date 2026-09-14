@@ -121,6 +121,18 @@ Collect the application's authoritative service health, client diagnostics, oper
 
 ## Deploy
 
+## Azure portal import and first run
+
+The workbook must be imported and saved before the portal can run its queries. A page headed **Unsaved Workbook** is a blank draft; it does not contain the investigation panels yet.
+
+1. In the target Log Analytics workspace, open **Workbooks** and create or open a workbook draft.
+2. Open the workbook's **Advanced Editor**, replace the draft JSON with the contents of [AVD Microsoft 365 Experience.workbook](AVD%20Microsoft%20365%20Experience.workbook), then apply the changes.
+3. Select the target **Log Analytics workspace** in the workbook parameter bar and set the complaint time range.
+4. Run **Diagnostic coverage and data freshness** first. Enable missing AVD diagnostic categories before relying on any other panel.
+5. Save the workbook with the display name **Azure Virtual Desktop Investigation** in the intended resource group and subscription.
+
+The workbook has no embedded tenant, subscription, or resource-group identifier. Selecting the workspace in the parameter bar controls which Log Analytics data is queried.
+
 Use the existing deployment script and override the display name:
 
 ```powershell
