@@ -1,6 +1,6 @@
 # Azure Virtual Desktop Investigation Workbook Guide
 
-This workbook helps investigate reports that an application feels slower in Azure Virtual Desktop (AVD) than in a previous virtual desktop environment.
+This workbook helps investigate Azure Virtual Desktop (AVD) connection, transport, logon, session-host, graphics, resource-discovery, scaling, and application-impact issues. Use it for a single-user complaint, a host-pool trend, a time-based incident, or a post-change validation; it does not require a comparison with another virtual desktop platform.
 
 It accompanies [Azure Virtual Desktop Investigation workbook](AVD%20Application%20Experience%20Investigation.workbook), titled **Azure Virtual Desktop Investigation** in the Azure portal.
 
