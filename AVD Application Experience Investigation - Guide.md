@@ -63,6 +63,24 @@ Use the panels in this order:
 20. **Session host provisioning and updates:** identifies configuration and deployment windows.
 21. **Autoscale occupancy and scaling decisions:** relates capacity decisions and Autoscale failures to the incident period.
 
+## Screenshot companion
+
+Use screenshots to make an investigation handoff easier to follow. Capture the following views in the stated order and place each image directly below its matching guide section or incident finding.
+
+| Screenshot | Capture target | What it demonstrates |
+| --- | --- | --- |
+| 1. Workbook landing view | Workbook title and the workspace, time-range, host-pool, gateway, user, and transport filters | The selected investigation scope |
+| 2. Coverage view | **Diagnostic coverage and data freshness** | Required WVD sources are present and current before interpreting other results |
+| 3. Complaint-time view | **30-minute AVD network risk at complaint time** | Whether RTT, bandwidth, TCP fallback, or insufficient coverage was present in the reported time window |
+| 4. User triage view | **User experience triage for application complaints** | Which users have the strongest AVD-side risk signals and why they are ranked high |
+| 5. Host and logon view | **Transport and bandwidth by session host** or **Logon timing and slow phases** | Whether the issue clusters on one host or in a session phase |
+| 6. Operational-change view | **Autoscale occupancy and scaling decisions**, **Session host provisioning and updates**, or **AVD management changes near an incident** | Whether a configuration, deployment, or scaling event aligns with the reported issue |
+| 7. Evidence-detail view | **Session transport, RTT, and bandwidth details** | The final user/session-level evidence behind the conclusion |
+
+Do not publish a portal screenshot until it has been redacted. Remove or obscure user names, email addresses, IP addresses, workspace and subscription identifiers, resource-group names, host names, tenant names, correlation IDs, and any customer-specific application or incident data. Retain only the panel title, column labels, color status, and values required to support the documented finding.
+
+Use a short caption beneath every screenshot in this form: **Finding:** [observed condition]. **Scope:** [time range, host pool, or cohort]. **Next action:** [specific validation or remediation].
+
 ## Investigation workflow
 
 1. Select the Log Analytics workspace and the complaint time range.
