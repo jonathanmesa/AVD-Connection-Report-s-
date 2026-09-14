@@ -14,6 +14,18 @@ No causal conclusion should be made from the current complaint statement alone. 
 4. Compare the affected scope with a peer user, host, host pool, time period, or application operation where a meaningful comparison exists.
 5. Change one suspected condition at a time; measure the targeted AVD and application outcomes before and after the change.
 
+## Use the workbook
+
+Load the [Azure Virtual Desktop Investigation workbook](AVD%20Application%20Experience%20Investigation.workbook) from the target **Log Analytics workspace**, not from a virtual machine or host-pool blade.
+
+1. In the Azure portal, open the target **Log Analytics workspace** and select **Workbooks**.
+2. Create a workbook draft, open **Advanced Editor**, and replace its JSON with the workbook file contents.
+3. Apply the changes, select the workspace in the workbook parameter bar, and choose the incident time range.
+4. Run **Diagnostic coverage and data freshness** before using any risk, user, host, or operational panel.
+5. Save the workbook as **Azure Virtual Desktop Investigation** in the intended subscription and resource group.
+
+The workbook has no embedded tenant, workspace, subscription, or resource-group identifier. Its parameters select the Log Analytics workspace queried by every panel. See the [Azure Virtual Desktop Investigation Workbook Guide](AVD%20Application%20Experience%20Investigation%20-%20Guide.md) for the 21-panel workflow and embedded examples.
+
 ## Time-correlation limitation
 
 Use the exact complaint timestamp to correlate with AVD events, normally in 30-minute buckets for triage. An AVD event that occurs near an application complaint is a hypothesis. It becomes actionable when the condition repeats across affected users or disappears after a controlled change.
