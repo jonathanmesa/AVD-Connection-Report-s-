@@ -39,6 +39,10 @@ Enable these AVD diagnostic tables in the selected Log Analytics workspace. The 
 
 ## Workbook panel map
 
+![Azure Virtual Desktop Investigation dashboard reading order and diagnostic coverage](docs/images/avd-diagnostic-coverage.png)
+
+**Finding:** The investigation starts with the dashboard reading order and confirms WVD diagnostic coverage before interpreting risk indicators. **Scope:** Sanitized live AVD workbook view. **Next action:** Review the complaint-time network-risk panel only after the required sources are present.
+
 Use the panels in this order:
 
 1. **Diagnostic coverage and data freshness:** confirms each WVD table is present and current.
