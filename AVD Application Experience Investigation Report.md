@@ -2,17 +2,17 @@
 
 ## Purpose and decision statement
 
-This report investigates reported application slowdowns after a move from legacy VDI to Azure Virtual Desktop (AVD). It defines how to determine whether the issue is caused by the AVD delivery path, a migrated-session configuration, the endpoint, the application, or its service and content path.
+This report investigates Azure Virtual Desktop (AVD) connection, transport, logon, session-host, graphics, resource-discovery, scaling, operational-change, and application-impact issues. It supports a single-user complaint, a host-pool trend, a time-based incident, or a post-change validation; a comparison with another virtual desktop platform is optional.
 
 No causal conclusion should be made from the current complaint statement alone. The deliverable from this investigation is a ranked evidence record for each complaint cohort, a remediation target, and a measured before/after outcome.
 
 ## Executive approach
 
-1. Segment affected employees by application, location, endpoint, AVD host pool, session host, AVD client version, and complaint time.
-2. Gather the affected application's operation time, failures, service health, and client diagnostic data. Do not use user perception alone.
-3. Correlate the affected users and exact event times with AVD connection, network, transport, logon, error, health, and graphics events.
-4. Compare each affected cohort to peer users using the same time window and, where possible, the same application operation outside AVD.
-5. Change one suspected condition at a time for a pilot cohort; measure the same operation and the relevant application and AVD metrics.
+1. Define the affected scope: user, host pool, session host, client version, location, time range, or reported application operation.
+2. Confirm diagnostic coverage before interpreting any risk indicator.
+3. Correlate the affected scope and exact event time with AVD connection, network, transport, logon, error, health, graphics, and operational-change events.
+4. Compare the affected scope with a peer user, host, host pool, time period, or application operation where a meaningful comparison exists.
+5. Change one suspected condition at a time; measure the targeted AVD and application outcomes before and after the change.
 
 ## Time-correlation limitation
 
