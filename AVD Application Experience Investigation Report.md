@@ -2,7 +2,7 @@
 
 ## Purpose and decision statement
 
-This report investigates Azure Virtual Desktop (AVD) connection, transport, logon, session-host, graphics, resource-discovery, scaling, operational-change, and application-impact issues. It supports a single-user complaint, a host-pool trend, a time-based incident, or a post-change validation; a comparison with another virtual desktop platform is optional.
+This report investigates Azure Virtual Desktop (AVD) connection, transport, logon, session-host, graphics, resource-discovery, scaling, operational-change, and application-impact issues. It supports a single-user complaint, a host-pool trend, a time-based incident, or a post-change validation.
 
 No causal conclusion should be made from the current complaint statement alone. The deliverable from this investigation is a ranked evidence record for each complaint cohort, a remediation target, and a measured before/after outcome.
 
