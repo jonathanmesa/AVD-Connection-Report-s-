@@ -72,7 +72,7 @@ For every affected cohort, collect:
 
 ## AVD query sequence
 
-Use the included [AVD Microsoft 365 Experience.workbook](AVD%20Microsoft%20365%20Experience.workbook) for all 12 WVD sources and its 21 investigation panels. The [workbook guide](AVD%20Microsoft%20365%20Experience%20-%20Guide.md) maps every panel to its purpose and investigation order. Run these query examples only when standalone analysis is required.
+Use the [Azure Virtual Desktop Investigation workbook](AVD%20Application%20Experience%20Investigation.workbook) for all 12 WVD sources and its 21 investigation panels. The [Azure Virtual Desktop Investigation Workbook Guide](AVD%20Application%20Experience%20Investigation%20-%20Guide.md) maps every panel to its purpose and investigation order. Run these query examples only when standalone analysis is required.
 
 ```kusto
 let StartTime = ago(7d);
