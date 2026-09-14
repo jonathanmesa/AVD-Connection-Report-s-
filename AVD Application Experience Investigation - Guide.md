@@ -127,6 +127,35 @@ Read the logon table in this order:
 - **P95 logon total:** the slowest 5% complete logons. Review its component phases when this is high.
 - **GPO, profile, FSLogix, and shell-start columns:** the largest phase identifies the next technical owner or remediation hypothesis.
 
+### Protocol comparison
+
+![Protocol comparison: which is faster and more stable](docs/images/avd-protocol-comparison.png)
+
+**Finding:** The screenshot compares observed transport paths across the selected AVD scope. **Scope:** Sanitized live protocol comparison. **Next action:** Investigate TCP fallback when it has shorter connections, poorer network coverage, higher RTT, or lower bandwidth than UDP.
+
+Read the protocol rows as a comparison, not as a pass/fail score:
+
+- **Protocol:** `UDP direct` is the preferred direct path. `UDP via TURN` is working UDP through a relay. `TCP fallback` is a reverse-connect path and warrants comparison with UDP, not an automatic incident.
+- **Sessions** and **Sessions with known duration:** show the sample size and whether session-duration conclusions are supported.
+- **Avg, Median, and P95 connected time:** longer and more consistent connection time generally indicates greater stability. A large gap between median and P95 indicates a wide range of session behavior.
+- **Network telemetry coverage:** low coverage means the RTT and bandwidth values cannot represent all sessions in the row.
+- **Avg/P95 RTT** and **Avg/P10 bandwidth:** compare these columns across transport types. Lower RTT and higher bandwidth are preferred; P95 RTT and P10 bandwidth show the degraded edge of the user population.
+
+### Autoscale decisions
+
+![Autoscale occupancy and scaling decisions](docs/images/avd-autoscale-decisions.png)
+
+**Finding:** The screenshot shows a sequence of successful Autoscale evaluations under the selected schedule. **Scope:** Sanitized live operational diagnostics view. **Next action:** When complaints follow a time-of-day pattern, compare their time bucket with the Autoscale result, active-host count, occupancy, and scaling reason.
+
+Read the Autoscale table as an operational timeline:
+
+- **TimeGenerated:** time of the Autoscale evaluation; align it with the complaint time.
+- **HostPool:** affected pool, sanitized in the example.
+- **ResultType:** `Succeeded` confirms the evaluation completed. `Failed` requires a follow-up search of `WVDErrors` using the same `CorrelationId`.
+- **ConfigScheduleName** and **ConfigSchedulePhase:** identify the Autoscale policy and phase that applied at that time.
+- **SessionCount**, **ActiveSessionHostCount**, **TotalSessionHostCount**, and **SessionOccupancyPercent:** show the active capacity context.
+- **ScalingReasonMessage:** explains why Autoscale started, stopped, or retained capacity; use it to distinguish a deliberate decision from an unexpected condition.
+
 ## Screenshot companion
 
 Use screenshots to make an investigation handoff easier to follow. Capture the following views in the stated order and place each image directly below its matching guide section or incident finding.
