@@ -4,6 +4,8 @@ This workbook helps investigate Azure Virtual Desktop (AVD) connection, transpor
 
 It accompanies [Azure Virtual Desktop Investigation workbook](AVD%20Application%20Experience%20Investigation.workbook), titled **Azure Virtual Desktop Investigation** in the Azure portal.
 
+Selecting one or more users in **Search or select user** scopes every investigation panel to those users. Host, graphics, registration, provisioning, management, and Autoscale views are limited through the selected users' sessions or host pools. **Diagnostic coverage and data freshness** is the one exception: it remains workspace-wide so it can verify whether each source table is collecting data at all.
+
 ## What it establishes
 
 The workbook tests whether poor user experience aligns with:
