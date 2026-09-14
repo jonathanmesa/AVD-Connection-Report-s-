@@ -94,6 +94,39 @@ Read the risk table from left to right:
 - **TcpFallbackPct:** percentage of sessions without an observed UDP path. Above 50% is high risk; 20-50% is a warning.
 - **Condition:** red indicates one or more high-risk thresholds, orange indicates a warning, green indicates no threshold was met, and gray indicates insufficient coverage.
 
+### User risk triage
+
+![User experience triage for application complaints](docs/images/avd-user-triage.png)
+
+**Finding:** The screenshot shows how the workbook ranks users when multiple AVD risk signals occur together. **Scope:** Sanitized live user-triage view. **Next action:** Select one high-risk user and review their session transport and timing details.
+
+Use this table to choose the first user to investigate:
+
+- **Risk:** the combined AVD risk category. High means at least one severe latency, bandwidth, transport, or error threshold was observed.
+- **User:** sanitized user label in this example. In the live workbook, use this value with the user filter to narrow all panels to one person.
+- **Sessions:** number of AVD sessions included for that user. More sessions make a repeated pattern more credible.
+- **NetworkCoveragePct:** confirms whether the user's RTT and bandwidth values are representative.
+- **TcpFallbackPct:** identifies users frequently unable to establish an observed UDP path.
+- **ErrorEvents:** count of related AVD errors. Start with users having both repeated errors and poor transport or network values.
+- **AvgRTTms** and **P95RTTms:** normal and degraded-path round-trip time. The P95 value highlights intermittent delays that an average can hide.
+- **AvgBandwidthMbps** and **P10BandwidthMbps:** typical and lower-end estimated bandwidth. The P10 value exposes constrained periods.
+
+### Session-host logon analysis
+
+![Logon timing and slow phases by session host](docs/images/avd-logon-timing.png)
+
+**Finding:** The screenshot shows the per-host logon table used to distinguish a broad network issue from a host or initialization issue. **Scope:** Sanitized live session-host view. **Next action:** Compare the slowest host with a healthy peer and inspect the largest logon phase.
+
+Read the logon table in this order:
+
+- **Host pool** and **Session host:** identify the AVD location of the logon. These labels are sanitized in the example.
+- **Logons:** sample size for the host in the selected range.
+- **Total logon time:** all observed logon time for the host; use it as context, not as a user-facing average.
+- **Avg authentication** and **P95 authentication:** identify slow identity or authentication behavior. P95 is the slowest 5% and is the first value to compare between hosts.
+- **Avg logon total:** the average complete Windows logon duration.
+- **P95 logon total:** the slowest 5% complete logons. Review its component phases when this is high.
+- **GPO, profile, FSLogix, and shell-start columns:** the largest phase identifies the next technical owner or remediation hypothesis.
+
 ## Screenshot companion
 
 Use screenshots to make an investigation handoff easier to follow. Capture the following views in the stated order and place each image directly below its matching guide section or incident finding.
