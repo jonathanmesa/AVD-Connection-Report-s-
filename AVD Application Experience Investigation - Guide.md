@@ -1,6 +1,8 @@
-# Azure Virtual Desktop Application Experience Investigation Workbook
+# Azure Virtual Desktop Investigation Workbook Guide
 
 This workbook helps investigate reports that an application feels slower in Azure Virtual Desktop (AVD) than in a previous virtual desktop environment.
+
+It accompanies [AVD Microsoft 365 Experience.workbook](AVD%20Microsoft%20365%20Experience.workbook). Despite the legacy filename, the workbook is application-neutral and is titled **Azure Virtual Desktop Investigation** in the Azure portal.
 
 ## What it establishes
 
@@ -34,6 +36,32 @@ Enable these AVD diagnostic tables in the selected Log Analytics workspace. The 
 - `WVDManagement`
 - `WVDSessionHostManagement`
 - `WVDAutoscaleEvaluationPooled`
+
+## Workbook panel map
+
+Use the panels in this order:
+
+1. **Diagnostic coverage and data freshness:** confirms each WVD table is present and current.
+2. **30-minute AVD network risk at complaint time:** identifies risk in the exact complaint window.
+3. **Selected complaining users compared with peers:** tests whether the affected cohort differs from other users.
+4. **Application experience: AVD path risk overview:** summarizes the selected scope as tiles.
+5. **User experience triage for application complaints:** ranks users by AVD risk signals.
+6. **30-minute AVD evidence export:** provides time-bucketed correlation data.
+7. **Transport and bandwidth by session host:** locates hosts with transport or network anomalies.
+8. **Logon timing and slow phases:** identifies authentication, profile, FSLogix, GPO, or shell delays.
+9. **Unhealthy session hosts and failed health checks:** exposes host and agent failures.
+10. **Graphics performance by host pool:** separates server, client, and network frame-delivery indicators.
+11. **Client version and AVD transport readiness:** finds client versions with poor transport results.
+12. **Protocol comparison: which is faster and more stable:** compares UDP direct, TURN, TCP fallback, and unknown transport.
+13. **Average connected time and bandwidth by user and protocol:** deep-dives one user's transport behavior.
+14. **Users who have never had a UDP connection:** identifies persistent non-UDP client or network paths.
+15. **Which users/devices are hitting errors, and their network conditions:** ties repeated errors to session behavior.
+16. **Session transport, RTT, and bandwidth details:** provides per-session evidence after narrowing the scope.
+17. **Workspace feed and resource retrieval failures:** investigates desktop or RemoteApp discovery and refresh failures.
+18. **Session host registration activity:** identifies hosts added, rebuilt, or repeatedly registering around an issue.
+19. **AVD management changes near an incident:** shows resource changes preceding a regression.
+20. **Session host provisioning and updates:** identifies configuration and deployment windows.
+21. **Autoscale occupancy and scaling decisions:** relates capacity decisions and Autoscale failures to the incident period.
 
 ## Investigation workflow
 

@@ -4,9 +4,9 @@
     {
       "type": 1,
       "content": {
-        "json": "# Azure Virtual Desktop Application Experience Investigation\r\nUse this workbook to determine whether reported application slowdowns align with the AVD network path, profile/logon delays, session-host health, graphics delivery, client versions, or AVD errors.\r\n\r\n> **Evidence boundary:** AVD diagnostics do not directly measure application transaction times. The panels below provide AVD evidence and correlation keys; validate application-specific symptoms with the affected application's service telemetry."
+        "json": "# Azure Virtual Desktop Investigation\r\nUse this workbook to determine whether reported user or application issues align with the AVD network path, profile/logon delays, session-host health, graphics delivery, client versions, operational changes, or AVD errors.\r\n\r\n> **Evidence boundary:** AVD diagnostics do not directly measure application transaction times. The panels below provide AVD evidence and correlation keys; validate application-specific symptoms with the affected application's service telemetry."
       },
-      "name": "Application experience heading",
+      "name": "AVD investigation heading",
       "styleSettings": {
         "margin": "0",
         "padding": "0"

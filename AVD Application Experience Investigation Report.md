@@ -1,4 +1,4 @@
-# Azure Virtual Desktop Application Experience Investigation Report
+# Azure Virtual Desktop Investigation Report
 
 ## Purpose and decision statement
 
@@ -72,7 +72,7 @@ For every affected cohort, collect:
 
 ## AVD query sequence
 
-Use the included [AVD Microsoft 365 Experience.workbook](AVD%20Microsoft%20365%20Experience.workbook) for all 12 WVD sources. The workbook contains the five operational context views below, so run these query examples only when standalone analysis is required.
+Use the included [AVD Microsoft 365 Experience.workbook](AVD%20Microsoft%20365%20Experience.workbook) for all 12 WVD sources and its 21 investigation panels. The [workbook guide](AVD%20Microsoft%20365%20Experience%20-%20Guide.md) maps every panel to its purpose and investigation order. Run these query examples only when standalone analysis is required.
 
 ```kusto
 let StartTime = ago(7d);
