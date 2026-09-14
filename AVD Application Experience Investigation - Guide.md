@@ -2,7 +2,7 @@
 
 This workbook helps investigate reports that an application feels slower in Azure Virtual Desktop (AVD) than in a previous virtual desktop environment.
 
-It accompanies [AVD Microsoft 365 Experience.workbook](AVD%20Microsoft%20365%20Experience.workbook). Despite the legacy filename, the workbook is application-neutral and is titled **Azure Virtual Desktop Investigation** in the Azure portal.
+It accompanies [Azure Virtual Desktop Investigation workbook](AVD%20Application%20Experience%20Investigation.workbook), titled **Azure Virtual Desktop Investigation** in the Azure portal.
 
 ## What it establishes
 
@@ -148,7 +148,7 @@ Collect the application's authoritative service health, client diagnostics, oper
 The workbook must be imported and saved before the portal can run its queries. A page headed **Unsaved Workbook** is a blank draft; it does not contain the investigation panels yet.
 
 1. In the target Log Analytics workspace, open **Workbooks** and create or open a workbook draft.
-2. Open the workbook's **Advanced Editor**, replace the draft JSON with the contents of [AVD Microsoft 365 Experience.workbook](AVD%20Microsoft%20365%20Experience.workbook), then apply the changes.
+2. Open the workbook's **Advanced Editor**, replace the draft JSON with the contents of [Azure Virtual Desktop Investigation workbook](AVD%20Application%20Experience%20Investigation.workbook), then apply the changes.
 3. Select the target **Log Analytics workspace** in the workbook parameter bar and set the complaint time range.
 4. Run **Diagnostic coverage and data freshness** first. Enable missing AVD diagnostic categories before relying on any other panel.
 5. Save the workbook with the display name **Azure Virtual Desktop Investigation** in the intended resource group and subscription.
@@ -160,6 +160,6 @@ Use the existing deployment script and override the display name:
 ```powershell
 .\Deploy-Workbook.ps1 `
     -ResourceGroupName '<resource-group>' `
-    -WorkbookFileName 'AVD Microsoft 365 Experience.workbook' `
+    -WorkbookFileName 'AVD Application Experience Investigation.workbook' `
     -DisplayName 'AVD Application Experience Investigation'
 ```
