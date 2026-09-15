@@ -17,6 +17,38 @@ Use it for a single user, a host pool, a gateway region, a client population, a 
 
 The workbook does not require a fixed workspace identifier. The workspace picker controls where every query runs.
 
+## How the data is collected
+
+The workbook reads Azure Virtual Desktop resource logs from the selected Azure Monitor Log Analytics workspace. The normal collection path is:
+
+1. An AVD resource such as a host pool, workspace, or application group emits a diagnostic event.
+2. Azure Monitor diagnostic settings route the selected AVD log categories to the chosen Log Analytics workspace.
+3. The event is stored in a strongly typed `WVD*` table, with `TimeGenerated` recording the event or measurement time in UTC.
+4. Workbook queries filter that table by the selected time range and correlate related records with `CorrelationId`, user, host pool, session host, gateway, or client fields.
+
+The workbook does not collect new telemetry and does not measure application transactions. It reads whatever diagnostic categories are already enabled and retained in the selected workspace. A missing row can mean that a category is disabled, the resource is not sending that category, the time range is outside retention, or the event did not occur.
+
+Configure collection on the relevant Azure Virtual Desktop resource under **Diagnostic settings**. Select the required AVD log categories and send them to the Log Analytics workspace used by this workbook. The Microsoft Learn supported-logs pages identify which tables belong to host pools, workspaces, and application groups.
+
+Official collection and schema references:
+
+- [Azure Monitor diagnostic settings](https://learn.microsoft.com/en-us/azure/azure-monitor/platform/diagnostic-settings)
+- [Supported logs for AVD host pools](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-logs/microsoft-desktopvirtualization-hostpools-logs)
+- [Supported logs for AVD workspaces](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-logs/microsoft-desktopvirtualization-workspaces-logs)
+- [Supported logs for AVD application groups](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-logs/microsoft-desktopvirtualization-applicationgroups-logs)
+- [Azure Monitor Logs table reference: WVD](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvd)
+- [Azure Monitor Log Analytics query overview](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-query-overview)
+
+### How joins work
+
+- `WVDConnections` is the session identity anchor.
+- `CorrelationId` connects a session to `WVDMultiLinkAdd`, `WVDConnectionNetworkData`, `WVDErrors`, checkpoints, and related event records.
+- `UserName`, `SessionHostName`, `_ResourceId`, and `GatewayRegion` support user, host, host-pool, and gateway comparisons.
+- `TimeGenerated` aligns measurements and errors to the complaint window.
+- Percentiles such as P95 RTT and P10 bandwidth describe the degraded tail; they are not individual-user measurements unless the query is filtered to one user.
+
+If a join produces no rows, check collection coverage and field availability before concluding that the session was healthy.
+
 ## Filter behavior
 
 The Host pool, Gateway region, User, and Transport outcome filters apply to the investigation panels. The User filter is particularly useful: select one user to follow that user through transport, network, errors, connected time, and session evidence.
@@ -205,7 +237,7 @@ Count distinct `CorrelationId` values when measuring affected attempts. Raw erro
 ```powershell
 .\Deploy-Workbook.ps1 `
     -ResourceGroupName '<resource-group>' `
-    -WorkbookFileName 'Vanguard AVD Transport Investigation.workbook' `
+    -WorkbookFileName 'AVD Connection Report - Vanguard' `
     -DisplayName 'Vanguard AVD Transport Investigation'
 ```
 
@@ -219,4 +251,9 @@ Count distinct `CorrelationId` values when measuring affected attempts. Raw erro
 - [Microsoft Learn: WVDCheckpoints](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvdcheckpoints)
 - [Microsoft Learn: WVDAgentHealthStatus](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvdagenthealthstatus)
 - [Microsoft Learn: WVDConnectionGraphicsDataPreview](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvdconnectiongraphicsdatapreview)
+- [Microsoft Learn: WVDFeeds](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvdfeeds)
+- [Microsoft Learn: WVDHostRegistrations](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvdhostregistrations)
+- [Microsoft Learn: WVDManagement](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvdmanagement)
+- [Microsoft Learn: WVDSessionHostManagement](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvdsessionhostmanagement)
+- [Microsoft Learn: WVDAutoscaleEvaluationPooled](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/wvdautoscaleevaluationpooled)
 - [Microsoft Learn: Configure RDP Shortpath](https://learn.microsoft.com/en-us/azure/virtual-desktop/configure-rdp-shortpath)
