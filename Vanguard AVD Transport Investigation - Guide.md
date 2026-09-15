@@ -232,6 +232,104 @@ Count distinct `CorrelationId` values when measuring affected attempts. Raw erro
 7. Validate the affected application's own telemetry before assigning application causality.
 8. Test one remediation at a time and repeat the same measurement.
 
+## How the connection-report queries work
+
+The workbook queries follow a consistent pattern so the result can be traced back to individual AVD connection records.
+
+### 1. Apply the workbook scope
+
+Most queries begin with a time filter and the selected workbook parameters:
+
+```kusto
+WVDConnections
+| where TimeGenerated {TimeRange}
+| where ('All' in ({HostPoolFilter}) or HostPool in ({HostPoolFilter}))
+| where ('All' in ({GatewayFilter}) or Gateway in ({GatewayFilter}))
+| where ('All' in ({UserFilter}) or User in ({UserFilter}))
+```
+
+`{TimeRange}`, `{HostPoolFilter}`, `{GatewayFilter}`, `{UserFilter}`, and `{TransportFilter}` are replaced by Azure Workbooks with the current parameter values. Do not paste the braces into Log Analytics as standalone KQL; they are workbook parameters.
+
+### 2. Build one connection row
+
+Connection-based panels use this pattern:
+
+```kusto
+WVDConnections
+| where TimeGenerated {TimeRange}
+| where State == "Connected"
+| summarize arg_max(TimeGenerated, *) by CorrelationId
+```
+
+`arg_max` keeps the latest record for each connection so state and client fields are not duplicated. `CorrelationId` is the connection-level key used to join network, transport, and error data.
+
+### 3. Classify transport
+
+The transport logic combines `WVDConnections` with `WVDMultiLinkAdd`. The workbook classifies a connection in this order:
+
+1. TURN evidence or `UdpUse=4` becomes **UDP via TURN**.
+2. Shortpath, Multipath, direct-link, or `UdpUse=1/2` evidence becomes **UDP direct**.
+3. WebSocket or TCP transport without UDP evidence becomes **TCP fallback**.
+4. Anything without decisive evidence becomes **Unknown**.
+
+This ordering prevents a connection with both historical and current link records from being incorrectly labelled as direct UDP when TURN evidence is present. Unknown is an evidence state, not a healthy result.
+
+### 4. Join network measurements
+
+Network panels join `WVDConnectionNetworkData` to the filtered connection set on `CorrelationId`:
+
+```kusto
+WVDConnectionNetworkData
+| where TimeGenerated {TimeRange}
+| join kind=inner Connections on CorrelationId
+| summarize AvgRTTms=avg(EstRoundTripTimeInMs),
+    P95RTTms=percentile(EstRoundTripTimeInMs,95),
+    P10BandwidthMbps=percentile(EstAvailableBandwidthKBps,10) * 8.0 / 1000
+    by CorrelationId
+```
+
+The bandwidth conversion is `KBps * 8 / 1000 = Mbps`. P95 RTT exposes the slow tail; P10 bandwidth exposes the constrained tail. Network coverage is calculated separately as the share of sessions with at least one network sample.
+
+### 5. Count errors by impact
+
+Error panels join `WVDErrors` to the connection set on `CorrelationId`. They report both:
+
+- **Errors:** raw error records, useful for understanding message volume.
+- **AffectedAttempts:** distinct connection IDs, useful for measuring how many attempts were affected.
+
+Use affected attempts to rank impact. A single retrying session can create many raw error records without representing many affected users.
+
+### 6. Explain each workbook query family
+
+| Query family | Tables and method | What the result answers |
+| --- | --- | --- |
+| **Transport health summary** | `WVDConnections` + `WVDMultiLinkAdd`; counts classified connected sessions | What percentage used direct UDP, TURN, TCP fallback, or unknown transport? |
+| **Transport trend** | The same transport classification grouped into time buckets | Did the transport mix change during the incident? |
+| **Session-host transport and bandwidth** | Connections joined to `WVDConnectionNetworkData`, grouped by host | Is one session host carrying worse transport, RTT, bandwidth, or coverage? |
+| **Host-pool connected time** | Connection start/disconnect states grouped by host pool and protocol | Are sessions on one protocol or pool shorter or less stable? |
+| **Gateway transport mix** | Connections grouped by `GatewayRegion`, with network aggregates | Does one Azure gateway region have a different transport or network pattern? |
+| **RTT and bandwidth trends** | Network samples joined to classified connections and binned over time | Is the path degrading at particular times rather than only in the overall average? |
+| **Protocol comparison** | Connected duration plus network percentiles grouped by transport | Which observed path is faster and more stable in this scope? |
+| **Client OS and version mix** | Connections grouped by `ClientOS`, `ClientType`, and `ClientVersion` | Is TCP fallback or poor network quality concentrated in one client population? |
+| **Location analysis** | Network samples joined to approximate client-IP geolocation | Does a regional client pattern exist? Locations are approximate and may be unavailable. |
+| **Logon phases** | `WVDConnections` joined to `WVDCheckpoints` where `Name == "LogonDelay"` | Which authentication, GPO, profile, FSLogix, or shell phase is slow? |
+| **Graphics performance** | `WVDConnectionGraphicsDataPreview` summarized by host pool | Are skipped frames or encode/decode/render delays server, network, or client-side? |
+| **Errors** | `WVDErrors` joined to connections and grouped by code, origin, user, device, or time | Which errors affect the most attempts, and do they align with network conditions? |
+| **Users without UDP** | User-level transport classification with an error join | Which users never establish an observed UDP path, and are errors also present? |
+| **Session detail** | One connection row joined to links, network samples, and errors | What exactly happened for a selected user's individual sessions? |
+
+### 7. Read aggregate results carefully
+
+- `count()` counts rows or events; `dcount(CorrelationId)` counts distinct attempts.
+- `avg()` is useful for overall direction but can hide a degraded tail.
+- `percentile(...,95)` and `percentile(...,10)` expose tail behavior; use them with sample counts and coverage.
+- `make_set()` provides examples, not a complete inventory.
+- `arg_max()` chooses the latest record in a group; it does not reconstruct every state transition.
+- `join kind=inner` keeps only records with a matching connection; `leftouter` preserves the base connection even when enrichment is missing.
+- Empty or missing enrichment is an evidence gap. It should not be converted to healthy or zero without an explicit reason.
+
+For official KQL syntax, see [Kusto Query Language overview](https://learn.microsoft.com/en-us/kusto/query/), [join operator](https://learn.microsoft.com/en-us/kusto/query/join-operator), [summarize operator](https://learn.microsoft.com/en-us/kusto/query/summarize-operator), [arg_max aggregation](https://learn.microsoft.com/en-us/kusto/query/arg-max-aggregation-function), and [percentile aggregation](https://learn.microsoft.com/en-us/kusto/query/percentiles-aggregation-function).
+
 ## Deployment
 
 ```powershell
