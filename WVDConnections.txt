@@ -1,0 +1,98 @@
+WVDConnections
+| where TimeGenerated > ago(7d)
+| where State == "Connected"
+| summarize arg_max(TimeGenerated, *) by CorrelationId
+| extend HostPool = extract("/hostpools/([^/]+)", 1, _ResourceId)
+| join kind = leftouter (
+    WVDMultiLinkAdd
+    | where TimeGenerated > ago(7d)
+    | summarize
+        LinkCount = dcount(LinkId),
+        ClientTransports = make_set(ClientTransportType),
+        ServerTransports = make_set(ServerTransportType),
+        ClientTURNIPs = make_set_if(
+                            ClientTURNIP,
+                            isnotempty(ClientTURNIP)
+                        ),
+        ServerTURNIPs = make_set_if(
+                            ServerTURNIP,
+                            isnotempty(ServerTURNIP)
+                        ),
+        TURNEvidence = countif(
+                           isnotempty(ClientTURNIP)
+        or isnotempty(ServerTURNIP)
+                       )
+        by CorrelationId
+    )
+    on CorrelationId
+| join kind = leftouter (
+    WVDErrors
+    | where TimeGenerated > ago(7d)
+    | summarize
+        ErrorCount = count(),
+        ErrorCodes = make_set(CodeSymbolic),
+        ErrorOperations = make_set(Operation),
+        ErrorMessages = make_set(Message)
+        by CorrelationId
+    )
+    on CorrelationId
+| join kind = leftouter (
+    WVDConnectionNetworkData
+    | where TimeGenerated > ago(7d)
+    | summarize
+        NetworkSamples = count(),
+        AverageRTTms = round(avg(EstRoundTripTimeInMs), 1),
+        P95RTTms = round(percentile(EstRoundTripTimeInMs, 95), 1),
+        AverageBandwidthKBps = round(
+                                   avg(EstAvailableBandwidthKBps),
+                                   0
+                               )
+        by CorrelationId
+    )
+    on CorrelationId
+| extend
+    LinkCount = coalesce(LinkCount, long(0)),
+    TURNEvidence = coalesce(TURNEvidence, long(0)),
+    ErrorCount = coalesce(ErrorCount, long(0)),
+    NetworkSamples = coalesce(NetworkSamples, long(0))
+| extend TransportAssessment = case(
+                                   TURNEvidence > 0,
+                                   "UDP through TURN confirmed",
+                                   LinkCount > 0,
+                                   "Additional link established; no TURN IP recorded",
+                                   TransportType in~("Shortpath", "TURN"),
+                                   strcat(TransportType, " reported"),
+                                   TransportType =~ "Multipath",
+                                   "Multipath reported; MultiLinkAdd evidence missing",
+                                   TransportType =~ "TCP Websocket",
+                                   "TCP reverse connect; no UDP link observed",
+                                   "Transport requires validation"
+                               )
+| project
+    TimeGenerated,
+    UserName,
+    HostPool,
+    SessionHostName,
+    GatewayRegion,
+    ClientOS,
+    ClientType,
+    ClientVersion,
+    TransportType,
+    UdpUse,
+    UdpType,
+    LinkCount,
+    ClientTransports,
+    ServerTransports,
+    ClientTURNIPs,
+    ServerTURNIPs,
+    ErrorCount,
+    ErrorCodes,
+    ErrorOperations,
+    ErrorMessages,
+    NetworkSamples,
+    AverageRTTms,
+    P95RTTms,
+    AverageBandwidthKBps,
+    TransportAssessment,
+    CorrelationId
+| order by TimeGenerated desc
